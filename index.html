@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>りんご🍎</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f0f4f8;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+    }
+
+    #container {
+      background: white;
+      margin-top: 2em;
+      padding: 2em;
+      border-radius: 16px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+      width: 90%;
+      max-width: 500px;
+      box-sizing: border-box;
+      text-align: center;
+    }
+
+    h1 {
+      margin-bottom: 0.2em;
+      color: #333;
+    }
+
+    #score {
+      margin-bottom: 1em;
+      color: #555;
+    }
+
+    select, button {
+      font-size: 1em;
+      padding: 0.5em 1em;
+      margin: 1em 0;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background: #fff;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    select:hover, button:hover {
+      background: #e0f0ff;
+      border-color: #80bfff;
+    }
+
+    #question {
+      margin: 1em 0;
+      font-size: 1.1em;
+    }
+
+    .choice {
+      display: block;
+      margin: 0.5em 0;
+      padding: 0.6em 1em;
+      background: #f9fafb;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .choice:hover {
+      background: #e8f4ff;
+    }
+
+    .correct {
+      background: #d4edda !important;
+      border-color: #28a745;
+    }
+
+    .incorrect {
+      background: #f8d7da !important;
+      border-color: #dc3545;
+    }
+
+    #next-btn {
+      display: none;
+      margin-top: 1em;
+    }
+    button.selected-mode {
+      background-color: #007bff;
+      color: white;
+      border-color: #007bff;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <h1>英語表現4択クイズ</h1>
+
+    <!-- ✅ モード選択ボタン -->
+    <div>
+      <button id="commuBtn">英コミュ</button>
+      <button id="ronpyouBtn">論表</button>
+    </div>
+
+    <label for="mode">出題モード：</label>
+    <select id="mode">
+      <option value="en-ja">英語 → 日本語</option>
+      <option value="ja-en">日本語 → 英語</option>
+      <option value="random">ランダム</option>
+    </select>
+
+    <div id="question">読み込み中...</div>
+    <div id="choices"></div>
+    <button id="next-btn">次の問題 ▶</button>
+    <div id="score">正解数: 0 / 0</div>
+  </div>
+
+  <script>
+    // ✅ データセット（論表）
+    const data_ronpyou = [
+      ["…するために", "in order to [do]"],
+      ["…するために（ややフォーマル）", "so as to [do]"],
+      ["(結局)…した", "only to [do]"],
+      ["率直に言って", "to be frank (with you)"],
+      ["正直に言って", "to be honest"],
+      ["まず最初に", "to begin with"],
+      ["さらに悪いことに", "to make matters worse"],
+      ["不思議なことに", "strange to say"],
+      ["…は言うまでもなく", "not to mention"],
+      ["いわば", "so to speak"],
+      ["…するのに十分〜", "enough to do"],
+      ["(人が)…するのに(時間が)かかる", "It takes (人) [時間] to do"],
+      ["(人が)…するのに(費用が)かかる", "It costs (人) [費用] to do"]
+    ];
+
+    // ✅ データセット（英コミュ）
+    const data_commu = [
+  ["時代", "era"],
+  ["主張する", "argue"],
+  ["ニューロン、神経細胞", "neuron"],
+  ["シナプス", "synapse"],
+  ["頻繁な", "frequent"],
+  ["信号、合図", "signal"],
+  ["明らかにする", "reveal"],
+  ["絶えず", "constantly"],
+  ["邪魔をする、中断する", "interrupt"],
+  ["探し求める", "seek"],
+  ["欲望,願望", "desire"],
+  ["受動的な", "passive"],
+  ["傾向がある", "tend"],
+  ["心理学", "psychology"],
+  ["参加者", "participant"],
+  ["削除する", "delete"],
+  ["適応する", "adapt"],
+  ["外部の", "external"],
+  ["果たす", "fulfill"],
+  ["強調、重視", "emphasis"],
+  ["利用可能な、手に入る", "available"],
+  ["巻き込む、を関与させる、を伴う", "involve"],
+  ["意味のある", "meaningful"],
+  ["～に関しては、～のことになると", "when it comes to"],
+  ["つまり、要するに", "in short"],
+  ["妨げる", "interfere with"],
+  ["制御できない", "out of control"],
+  ["～する努力をする", "make an effort to do"],
+  ["神経伝達物質", "neurotransmitter"]
+]
+;
+
+    let currentDataset = data_ronpyou;
+
+    const questionDiv = document.getElementById("question");
+    const choicesDiv = document.getElementById("choices");
+    const nextBtn = document.getElementById("next-btn");
+    const modeSelect = document.getElementById("mode");
+    const scoreDisplay = document.getElementById("score");
+    const commuBtn = document.getElementById("commuBtn");
+    const ronpyouBtn = document.getElementById("ronpyouBtn");
+
+    let currentAnswer = "";
+    let total = 0;
+    let correct = 0;
+    let choiceButtons = [];
+
+    function shuffle(array) {
+      return array.sort(() => Math.random() - 0.5);
+    }
+
+    function updateScore() {
+      scoreDisplay.textContent = `正解数: ${correct} / ${total}`;
+    }
+
+    function showQuestion() {
+      nextBtn.style.display = "none";
+      choicesDiv.innerHTML = "";
+      choiceButtons = [];
+
+      const pair = currentDataset[Math.floor(Math.random() * currentDataset.length)];
+      const ja = pair[0];
+      const en = pair[1];
+      let isJaToEn;
+
+      switch (modeSelect.value) {
+        case "ja-en":
+          isJaToEn = true;
+          break;
+        case "en-ja":
+          isJaToEn = false;
+          break;
+        default:
+          isJaToEn = Math.random() < 0.5;
+      }
+
+      const questionText = isJaToEn ? `"${ja}" は英語で？` : `"${en}" は日本語で？`;
+      questionDiv.textContent = questionText;
+      currentAnswer = isJaToEn ? en : ja;
+
+      const allChoices = [currentAnswer];
+      while (allChoices.length < 4) {
+        const randPair = currentDataset[Math.floor(Math.random() * currentDataset.length)];
+        const choice = isJaToEn ? randPair[1] : randPair[0];
+        if (!allChoices.includes(choice)) allChoices.push(choice);
+      }
+
+      shuffle(allChoices).forEach((choice, index) => {
+        const btn = document.createElement("button");
+        btn.textContent = choice;
+        btn.className = "choice";
+        btn.dataset.index = index + 1;
+        btn.onclick = () => {
+          if (btn.disabled) return;
+          total++;
+          if (choice === currentAnswer) {
+            btn.classList.add("correct");
+            correct++;
+          } else {
+            btn.classList.add("incorrect");
+            choiceButtons.forEach(b => {
+              if (b.textContent === currentAnswer) b.classList.add("correct");
+            });
+          }
+          updateScore();
+          choiceButtons.forEach(b => b.disabled = true);
+          nextBtn.style.display = "inline-block";
+        };
+        choicesDiv.appendChild(btn);
+        choiceButtons.push(btn);
+      });
+    }
+
+    nextBtn.onclick = showQuestion;
+    modeSelect.onchange = showQuestion;
+
+    document.addEventListener("keydown", e => {
+      if (e.key >= '1' && e.key <= '4') {
+        const idx = parseInt(e.key, 10) - 1;
+        if (choiceButtons[idx]) choiceButtons[idx].click();
+      } else if (e.key === "Enter") {
+        if (nextBtn.style.display !== "none") nextBtn.click();
+      } else if (e.key === "Escape") {
+        location.reload();
+      }
+    });
+
+// 選択中ボタンのハイライトを切り替える関数
+function setModeButtonSelected(selectedBtn) {
+  commuBtn.classList.remove("selected-mode");
+  ronpyouBtn.classList.remove("selected-mode");
+  selectedBtn.classList.add("selected-mode");
+}
+
+commuBtn.onclick = () => {
+  currentDataset = data_commu;
+  correct = 0;
+  total = 0;
+  updateScore();
+  showQuestion();
+  setModeButtonSelected(commuBtn); // ← 追加
+};
+
+ronpyouBtn.onclick = () => {
+  currentDataset = data_ronpyou;
+  correct = 0;
+  total = 0;
+  updateScore();
+  showQuestion();
+  setModeButtonSelected(ronpyouBtn); // ← 追加
+};
+
+
+    window.onload = () => {
+      updateScore();
+      showQuestion();
+      setModeButtonSelected(ronpyouBtn); // ← 初期データが論表なので
+    };
+  </script>
+</body>
